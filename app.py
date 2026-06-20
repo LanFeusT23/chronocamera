@@ -11,6 +11,8 @@ from PIL import Image, ImageTk
 DEFAULT_INTERVALS = (2, 5, 10, 30, 60)
 DEFAULT_EXPORT_SIZE = (1920, 1080)
 DEFAULT_OUTPUT_FPS = 30
+DEFAULT_PREVIEW_SIZE = (960, 540)
+DEFAULT_MP4_CODECS = ("avc1", "mp4v")
 
 
 class ChronoCameraApp:
@@ -170,19 +172,22 @@ class ChronoCameraApp:
         if filename:
             filename = Path(filename).stem
         else:
-            timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H%M%S%z")
             filename = f"chronocamera-{timestamp}"
 
         return str(save_dir / f"{filename}.mp4")
 
-    def _write_video(self, output_path: str) -> bool:
-        writer = None
-        for codec in ("avc1", "mp4v"):
+    @staticmethod
+    def _create_video_writer(output_path: str) -> cv2.VideoWriter | None:
+        for codec in DEFAULT_MP4_CODECS:
             attempt = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*codec), DEFAULT_OUTPUT_FPS, DEFAULT_EXPORT_SIZE)
             if attempt.isOpened():
-                writer = attempt
-                break
+                return attempt
             attempt.release()
+        return None
+
+    def _write_video(self, output_path: str) -> bool:
+        writer = self._create_video_writer(output_path)
         if writer is None:
             return False
 
@@ -199,7 +204,7 @@ class ChronoCameraApp:
             self.current_frame = frame
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(rgb)
-            image.thumbnail((960, 540))
+            image.thumbnail(DEFAULT_PREVIEW_SIZE)
             photo = ImageTk.PhotoImage(image=image)
             self.preview_label.configure(image=photo)
             self.preview_label.image = photo
