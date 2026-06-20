@@ -212,7 +212,7 @@
     if (platform === 'win32') {
       ffmpegPlatformInfo.innerHTML = `
         <p>Click <strong>Download FFmpeg</strong> to automatically download and install FFmpeg for Windows.</p>
-        <p>Source: <a href="#" style="color: #5b9bd5;">gyan.dev/ffmpeg/builds</a></p>
+        <p>Source: <span style="color: #5b9bd5;">gyan.dev/ffmpeg/builds</span></p>
       `;
       ffmpegDownloadBtn.style.display = '';
     } else if (platform === 'linux') {
@@ -226,7 +226,7 @@
     } else {
       ffmpegPlatformInfo.innerHTML = `
         <p>Please install FFmpeg manually and ensure it is in your system PATH.</p>
-        <p>Visit: <a href="#" style="color: #5b9bd5;">ffmpeg.org/download.html</a></p>
+        <p>Visit: <span style="color: #5b9bd5;">ffmpeg.org/download.html</span></p>
       `;
       ffmpegDownloadBtn.style.display = 'none';
     }
