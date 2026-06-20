@@ -13,6 +13,8 @@ DEFAULT_EXPORT_SIZE = (1920, 1080)
 DEFAULT_OUTPUT_FPS = 30
 DEFAULT_PREVIEW_SIZE = (960, 540)
 DEFAULT_MP4_CODECS = ("avc1", "mp4v")
+DEFAULT_TIMESTAMP_FORMAT = "%Y%m%dT%H%M%SZ"
+PREVIEW_UPDATE_INTERVAL_MS = 30
 
 
 class ChronoCameraApp:
@@ -22,7 +24,7 @@ class ChronoCameraApp:
 
         self.capture = cv2.VideoCapture(0)
         if not self.capture.isOpened():
-            raise RuntimeError("Unable to open webcam")
+            raise RuntimeError("Unable to open webcam. Please check that a webcam is connected and not in use by another application.")
 
         self.capture_interval_seconds = DEFAULT_INTERVALS[0]
         self.recording = False
@@ -111,7 +113,7 @@ class ChronoCameraApp:
                     if value <= 0:
                         raise ValueError
                 except ValueError:
-                    messagebox.showerror("Invalid interval", "Custom interval must be a positive integer.", parent=dialog)
+                    messagebox.showerror("Invalid interval", "Custom interval must be a positive integer (1 or greater).", parent=dialog)
                     return
             else:
                 value = int(mode)
@@ -175,7 +177,7 @@ class ChronoCameraApp:
         if filename:
             filename = Path(filename).stem
         else:
-            timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            timestamp = dt.datetime.now(dt.timezone.utc).strftime(DEFAULT_TIMESTAMP_FORMAT)
             filename = f"chronocamera-{timestamp}"
 
         return str(save_dir / f"{filename}.mp4")
@@ -219,7 +221,7 @@ class ChronoCameraApp:
                     self.next_capture_time = now + self.capture_interval_seconds
                     self.status_var.set(f"Recording timelapse... Frames: {len(self.captured_frames)}")
 
-        self.root.after(30, self.update_preview)
+        self.root.after(PREVIEW_UPDATE_INTERVAL_MS, self.update_preview)
 
     def on_close(self) -> None:
         try:
