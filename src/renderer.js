@@ -27,6 +27,7 @@
   let capturedFrames = [];
   let captureTimerId = null;
   let stream = null;
+  let timestampOverlayEnabled = false;
 
   // Canvas context for frame capture
   canvasEl.width = EXPORT_WIDTH;
@@ -56,9 +57,44 @@
   function captureFrame() {
     if (!stream || !videoEl.videoWidth) return;
     ctx.drawImage(videoEl, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
+
+    if (timestampOverlayEnabled) {
+      drawTimestamp();
+    }
+
     const dataUrl = canvasEl.toDataURL('image/png');
     capturedFrames.push(dataUrl);
     setStatus(`Recording timelapse... Frames: ${capturedFrames.length}`);
+  }
+
+  function drawTimestamp() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const text = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    const fontSize = 36;
+    const padding = 16;
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+
+    // Draw background for readability
+    const metrics = ctx.measureText(text);
+    const bgX = EXPORT_WIDTH - padding - metrics.width - 8;
+    const bgY = padding - 4;
+    const bgW = metrics.width + 16;
+    const bgH = fontSize + 12;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(bgX, bgY, bgW, bgH);
+
+    // Draw text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, EXPORT_WIDTH - padding, padding);
   }
 
   function startCapture() {
@@ -153,6 +189,8 @@
       customIntervalInput.disabled = true;
       customIntervalInput.value = '';
     }
+    // Sync timestamp overlay checkbox
+    document.getElementById('timestamp-overlay').checked = timestampOverlayEnabled;
     settingsModal.classList.remove('hidden');
   });
 
@@ -178,6 +216,10 @@
     } else {
       captureIntervalSeconds = parseInt(selected.value, 10);
     }
+
+    // Save timestamp overlay setting
+    const timestampCheckbox = document.getElementById('timestamp-overlay');
+    timestampOverlayEnabled = timestampCheckbox.checked;
 
     intervalLabel.textContent = `Interval: ${captureIntervalSeconds}s`;
     settingsModal.classList.add('hidden');
