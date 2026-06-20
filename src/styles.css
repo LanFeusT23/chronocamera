@@ -171,3 +171,57 @@ button:active {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* FFmpeg Modal */
+#ffmpeg-modal .modal-content {
+  max-width: 480px;
+}
+
+#ffmpeg-modal p {
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+#ffmpeg-progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+#ffmpeg-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #5b9bd5;
+  transition: width 0.3s ease;
+}
+
+#ffmpeg-progress-status {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 12px;
+}
+
+.error-text {
+  color: #e74c3c;
+  white-space: pre-wrap;
+}
+
+.success-text {
+  color: #27ae60;
+}
+
+#ffmpeg-platform-info {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #bbb;
+}
+
+#ffmpeg-platform-info code {
+  background: #1e1e1e;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}

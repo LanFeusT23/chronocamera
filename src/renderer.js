@@ -187,6 +187,86 @@
     settingsModal.classList.add('hidden');
   });
 
+  // FFmpeg modal elements
+  const ffmpegModal = document.getElementById('ffmpeg-modal');
+  const ffmpegPlatformInfo = document.getElementById('ffmpeg-platform-info');
+  const ffmpegDownloadBtn = document.getElementById('ffmpeg-download-btn');
+  const ffmpegCloseBtn = document.getElementById('ffmpeg-close-btn');
+  const ffmpegProgressContainer = document.getElementById('ffmpeg-progress-container');
+  const ffmpegProgressBar = document.getElementById('ffmpeg-progress-bar');
+  const ffmpegProgressStatus = document.getElementById('ffmpeg-progress-status');
+  const ffmpegError = document.getElementById('ffmpeg-error');
+  const ffmpegSuccess = document.getElementById('ffmpeg-success');
+
+  // Check FFmpeg availability on startup
+  async function checkFfmpegAvailability() {
+    const available = await window.electronAPI.checkFfmpeg();
+    if (!available) {
+      showFfmpegModal();
+    }
+  }
+
+  async function showFfmpegModal() {
+    const { platform } = await window.electronAPI.getPlatformInfo();
+
+    if (platform === 'win32') {
+      ffmpegPlatformInfo.innerHTML = `
+        <p>Click <strong>Download FFmpeg</strong> to automatically download and install FFmpeg for Windows.</p>
+        <p>Source: <a href="#" style="color: #5b9bd5;">gyan.dev/ffmpeg/builds</a></p>
+      `;
+      ffmpegDownloadBtn.style.display = '';
+    } else if (platform === 'linux') {
+      ffmpegPlatformInfo.innerHTML = `
+        <p>Install FFmpeg using your package manager:</p>
+        <p><code>sudo apt install ffmpeg</code></p>
+        <p>or</p>
+        <p><code>sudo dnf install ffmpeg</code></p>
+      `;
+      ffmpegDownloadBtn.style.display = 'none';
+    } else {
+      ffmpegPlatformInfo.innerHTML = `
+        <p>Please install FFmpeg manually and ensure it is in your system PATH.</p>
+        <p>Visit: <a href="#" style="color: #5b9bd5;">ffmpeg.org/download.html</a></p>
+      `;
+      ffmpegDownloadBtn.style.display = 'none';
+    }
+
+    ffmpegModal.classList.remove('hidden');
+  }
+
+  ffmpegDownloadBtn.addEventListener('click', async () => {
+    ffmpegDownloadBtn.disabled = true;
+    ffmpegError.classList.add('hidden');
+    ffmpegSuccess.classList.add('hidden');
+    ffmpegProgressContainer.classList.remove('hidden');
+    ffmpegProgressBar.style.width = '0%';
+    ffmpegProgressStatus.textContent = 'Starting download...';
+
+    const result = await window.electronAPI.downloadFfmpeg();
+
+    if (result.success) {
+      ffmpegSuccess.classList.remove('hidden');
+      ffmpegProgressContainer.classList.add('hidden');
+      ffmpegDownloadBtn.style.display = 'none';
+    } else {
+      ffmpegError.textContent = result.error;
+      ffmpegError.classList.remove('hidden');
+      ffmpegProgressContainer.classList.add('hidden');
+      ffmpegDownloadBtn.disabled = false;
+    }
+  });
+
+  // Listen for download progress
+  window.electronAPI.onFfmpegDownloadProgress((data) => {
+    ffmpegProgressBar.style.width = `${data.percent}%`;
+    ffmpegProgressStatus.textContent = data.status;
+  });
+
+  ffmpegCloseBtn.addEventListener('click', () => {
+    ffmpegModal.classList.add('hidden');
+  });
+
   // Initialize
   initWebcam();
+  checkFfmpegAvailability();
 })();

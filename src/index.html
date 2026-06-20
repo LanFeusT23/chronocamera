@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.gyan.dev;" />
   <title>ChronoCamera</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -52,6 +52,27 @@
       <div class="modal-buttons">
         <button id="settings-save-btn">Save</button>
         <button id="settings-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FFmpeg Missing Modal -->
+  <div id="ffmpeg-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>⚠️ FFmpeg Not Found</h3>
+      <p>FFmpeg is required to encode timelapse videos but was not found on your system.</p>
+      <div id="ffmpeg-platform-info"></div>
+      <div id="ffmpeg-progress-container" class="hidden">
+        <div id="ffmpeg-progress-bar-container">
+          <div id="ffmpeg-progress-bar"></div>
+        </div>
+        <p id="ffmpeg-progress-status"></p>
+      </div>
+      <p id="ffmpeg-error" class="hidden error-text"></p>
+      <p id="ffmpeg-success" class="hidden success-text">✅ FFmpeg installed successfully! You can now record timelapses.</p>
+      <div class="modal-buttons">
+        <button id="ffmpeg-download-btn">Download FFmpeg</button>
+        <button id="ffmpeg-close-btn">Close</button>
       </div>
     </div>
   </div>
