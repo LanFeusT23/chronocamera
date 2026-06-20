@@ -28,6 +28,7 @@
   let captureTimerId = null;
   let stream = null;
   let timestampOverlayEnabled = false;
+  let recordingStartTime = null;
 
   // Canvas context for frame capture
   canvasEl.width = EXPORT_WIDTH;
@@ -68,14 +69,11 @@
   }
 
   function drawTimestamp() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const text = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    const elapsed = recordingStartTime ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0;
+    const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const seconds = String(elapsed % 60).padStart(2, '0');
+    const text = `${hours}:${minutes}:${seconds}`;
 
     const fontSize = 36;
     const padding = 16;
@@ -99,6 +97,7 @@
 
   function startCapture() {
     capturedFrames = [];
+    recordingStartTime = Date.now();
     captureFrame(); // Capture first frame immediately
     captureTimerId = setInterval(captureFrame, captureIntervalSeconds * 1000);
   }
@@ -108,6 +107,7 @@
       clearInterval(captureTimerId);
       captureTimerId = null;
     }
+    recordingStartTime = null;
   }
 
   // Recording toggle
