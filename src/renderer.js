@@ -103,7 +103,7 @@
   function startCapture() {
     capturedFrames = [];
     recordingStartTime = Date.now();
-    captureFrame(); // Capture first frame immediately
+    captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
     captureTimerId = setInterval(captureFrame, captureIntervalSeconds * 1000);
     captureProgressContainer.classList.remove('hidden');
     startProgressAnimation();
@@ -122,10 +122,11 @@
   }
 
   function startProgressAnimation() {
+    const intervalMs = captureIntervalSeconds * 1000;
     function tick() {
       if (lastCaptureTime !== null) {
         const elapsed = Date.now() - lastCaptureTime;
-        const pct = Math.min(elapsed / (captureIntervalSeconds * 1000), 1) * 100;
+        const pct = Math.min(elapsed / intervalMs, 1) * 100;
         captureProgressBar.style.width = `${pct}%`;
       }
       progressRafId = requestAnimationFrame(tick);
