@@ -16,6 +16,8 @@
   const browseBtn = document.getElementById('browse-btn');
   const filenameInput = document.getElementById('filename');
   const statusBar = document.getElementById('status-bar');
+  const captureProgressContainer = document.getElementById('capture-progress-container');
+  const captureProgressBar = document.getElementById('capture-progress-bar');
   const settingsModal = document.getElementById('settings-modal');
   const settingsSaveBtn = document.getElementById('settings-save-btn');
   const settingsCancelBtn = document.getElementById('settings-cancel-btn');
@@ -29,6 +31,8 @@
   let stream = null;
   let timestampOverlayEnabled = false;
   let recordingStartTime = null;
+  let lastCaptureTime = null;
+  let progressRafId = null;
 
   // Canvas context for frame capture
   canvasEl.width = EXPORT_WIDTH;
@@ -66,6 +70,7 @@
     const dataUrl = canvasEl.toDataURL('image/png');
     capturedFrames.push(dataUrl);
     setStatus(`Recording timelapse... Frames: ${capturedFrames.length}`);
+    lastCaptureTime = Date.now();
   }
 
   function drawTimestamp() {
@@ -98,8 +103,10 @@
   function startCapture() {
     capturedFrames = [];
     recordingStartTime = Date.now();
-    captureFrame(); // Capture first frame immediately
+    captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
     captureTimerId = setInterval(captureFrame, captureIntervalSeconds * 1000);
+    captureProgressContainer.classList.remove('hidden');
+    startProgressAnimation();
   }
 
   function stopCapture() {
@@ -108,6 +115,30 @@
       captureTimerId = null;
     }
     recordingStartTime = null;
+    lastCaptureTime = null;
+    stopProgressAnimation();
+    captureProgressContainer.classList.add('hidden');
+    captureProgressBar.style.width = '0%';
+  }
+
+  function startProgressAnimation() {
+    const intervalMs = captureIntervalSeconds * 1000;
+    function tick() {
+      if (lastCaptureTime !== null) {
+        const elapsed = Date.now() - lastCaptureTime;
+        const pct = Math.min(elapsed / intervalMs, 1) * 100;
+        captureProgressBar.style.width = `${pct}%`;
+      }
+      progressRafId = requestAnimationFrame(tick);
+    }
+    progressRafId = requestAnimationFrame(tick);
+  }
+
+  function stopProgressAnimation() {
+    if (progressRafId !== null) {
+      cancelAnimationFrame(progressRafId);
+      progressRafId = null;
+    }
   }
 
   // Recording toggle
