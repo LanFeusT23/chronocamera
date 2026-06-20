@@ -75,13 +75,25 @@ class ChronoCameraApp:
 
         ttk.Label(dialog, text="Choose interval:").grid(row=0, column=0, sticky="w", padx=12, pady=(12, 8))
 
+        custom_entry = ttk.Entry(dialog, textvariable=custom_var, width=10)
         row = 1
         for interval in DEFAULT_INTERVALS:
-            ttk.Radiobutton(dialog, text=f"{interval}s", value=str(interval), variable=selected_mode, command=lambda: self._toggle_custom_state(selected_mode, custom_entry)).grid(row=row, column=0, sticky="w", padx=12)
+            ttk.Radiobutton(
+                dialog,
+                text=f"{interval}s",
+                value=str(interval),
+                variable=selected_mode,
+                command=lambda entry=custom_entry: self._toggle_custom_state(selected_mode, entry),
+            ).grid(row=row, column=0, sticky="w", padx=12)
             row += 1
 
-        ttk.Radiobutton(dialog, text="Custom (seconds):", value="custom", variable=selected_mode, command=lambda: self._toggle_custom_state(selected_mode, custom_entry)).grid(row=row, column=0, sticky="w", padx=12, pady=(2, 0))
-        custom_entry = ttk.Entry(dialog, textvariable=custom_var, width=10)
+        ttk.Radiobutton(
+            dialog,
+            text="Custom (seconds):",
+            value="custom",
+            variable=selected_mode,
+            command=lambda entry=custom_entry: self._toggle_custom_state(selected_mode, entry),
+        ).grid(row=row, column=0, sticky="w", padx=12, pady=(2, 0))
         custom_entry.grid(row=row, column=1, sticky="w", padx=(0, 12), pady=(2, 0))
 
         self._toggle_custom_state(selected_mode, custom_entry)
@@ -158,14 +170,20 @@ class ChronoCameraApp:
         if filename:
             filename = Path(filename).stem
         else:
-            timestamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             filename = f"chronocamera-{timestamp}"
 
         return str(save_dir / f"{filename}.mp4")
 
     def _write_video(self, output_path: str) -> bool:
-        writer = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), DEFAULT_OUTPUT_FPS, DEFAULT_EXPORT_SIZE)
-        if not writer.isOpened():
+        writer = None
+        for codec in ("avc1", "mp4v"):
+            attempt = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*codec), DEFAULT_OUTPUT_FPS, DEFAULT_EXPORT_SIZE)
+            if attempt.isOpened():
+                writer = attempt
+                break
+            attempt.release()
+        if writer is None:
             return False
 
         for frame in self.captured_frames:
@@ -204,7 +222,7 @@ class ChronoCameraApp:
 
 def main() -> None:
     root = tk.Tk()
-    app = ChronoCameraApp(root)
+    ChronoCameraApp(root)
     root.minsize(900, 640)
     root.mainloop()
 
