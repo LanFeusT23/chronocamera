@@ -214,7 +214,7 @@ function runFFmpeg(inputDir, outputPath) {
     const inputPattern = path.join(inputDir, 'frame-%06d.png');
     const args = [
       '-y',
-      '-framerate', '1/0.3',
+      '-framerate', '1/0.3', // Each input frame is displayed for 0.3 seconds
       '-i', inputPattern,
       '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
       '-c:v', 'libx264',
