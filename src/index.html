@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.gyan.dev;" />
+  <title>ChronoCamera</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="preview-container">
+      <video id="webcam-preview" autoplay muted playsinline></video>
+      <canvas id="capture-canvas" hidden></canvas>
+    </div>
+
+    <div id="controls">
+      <div id="controls-row-1">
+        <button id="record-btn">Start Recording</button>
+        <button id="settings-btn">Settings</button>
+        <span id="interval-label">Interval: 2s</span>
+      </div>
+
+      <div id="controls-row-2">
+        <label for="save-dir">Save directory:</label>
+        <input type="text" id="save-dir" readonly />
+        <button id="browse-btn">Browse</button>
+      </div>
+
+      <div id="controls-row-3">
+        <label for="filename">Optional filename:</label>
+        <input type="text" id="filename" placeholder="chronocamera-{timestamp}.mp4" />
+      </div>
+    </div>
+
+    <div id="status-bar">Idle</div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Timelapse Settings</h3>
+      <div id="interval-options">
+        <label><input type="radio" name="interval" value="2" checked /> 2s</label>
+        <label><input type="radio" name="interval" value="5" /> 5s</label>
+        <label><input type="radio" name="interval" value="10" /> 10s</label>
+        <label><input type="radio" name="interval" value="30" /> 30s</label>
+        <label><input type="radio" name="interval" value="60" /> 60s</label>
+        <label><input type="radio" name="interval" value="custom" /> Custom:</label>
+        <input type="number" id="custom-interval" min="1" disabled placeholder="seconds" />
+      </div>
+      <hr style="border-color: #444; margin: 16px 0;" />
+      <div id="overlay-options">
+        <label><input type="checkbox" id="timestamp-overlay" /> Embed timer on video (top-right)</label>
+      </div>
+      <div class="modal-buttons">
+        <button id="settings-save-btn">Save</button>
+        <button id="settings-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FFmpeg Missing Modal -->
+  <div id="ffmpeg-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>⚠️ FFmpeg Not Found</h3>
+      <p>FFmpeg is required to encode timelapse videos but was not found on your system.</p>
+      <div id="ffmpeg-platform-info"></div>
+      <div id="ffmpeg-progress-container" class="hidden">
+        <div id="ffmpeg-progress-bar-container">
+          <div id="ffmpeg-progress-bar"></div>
+        </div>
+        <p id="ffmpeg-progress-status"></p>
+      </div>
+      <p id="ffmpeg-error" class="hidden error-text"></p>
+      <p id="ffmpeg-success" class="hidden success-text">✅ FFmpeg installed successfully! You can now record timelapses.</p>
+      <div class="modal-buttons">
+        <button id="ffmpeg-download-btn">Download FFmpeg</button>
+        <button id="ffmpeg-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

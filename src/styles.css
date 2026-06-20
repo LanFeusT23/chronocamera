@@ -1,0 +1,231 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 12px;
+  gap: 10px;
+}
+
+#preview-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#webcam-preview {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 4px;
+}
+
+#controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#controls-row-1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#controls-row-2,
+#controls-row-3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#controls-row-2 label,
+#controls-row-3 label {
+  white-space: nowrap;
+  min-width: 130px;
+}
+
+#controls-row-2 input,
+#controls-row-3 input {
+  flex: 1;
+}
+
+input[type="text"],
+input[type="number"] {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  outline: none;
+  border-color: #5b9bd5;
+}
+
+button {
+  background: #3a3a3a;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background: #4a4a4a;
+}
+
+button:active {
+  background: #2a2a2a;
+}
+
+#record-btn.recording {
+  background: #c0392b;
+  border-color: #e74c3c;
+  color: #fff;
+}
+
+#interval-label {
+  font-size: 14px;
+  color: #aaa;
+}
+
+#status-bar {
+  font-size: 13px;
+  color: #aaa;
+  padding: 4px 0;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 320px;
+}
+
+.modal-content h3 {
+  margin-bottom: 16px;
+}
+
+#interval-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+#interval-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+#custom-interval {
+  width: 80px;
+  margin-left: 24px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* FFmpeg Modal */
+#ffmpeg-modal .modal-content {
+  max-width: 480px;
+}
+
+#ffmpeg-modal p {
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+#ffmpeg-progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+#ffmpeg-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #5b9bd5;
+  transition: width 0.3s ease;
+}
+
+#ffmpeg-progress-status {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 12px;
+}
+
+.error-text {
+  color: #e74c3c;
+  white-space: pre-wrap;
+}
+
+.success-text {
+  color: #27ae60;
+}
+
+#ffmpeg-platform-info {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #bbb;
+}
+
+#ffmpeg-platform-info code {
+  background: #1e1e1e;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
