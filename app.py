@@ -74,10 +74,13 @@ class ChronoCameraApp:
 
         selected_mode = tk.StringVar(value=str(self.capture_interval_seconds if self.capture_interval_seconds in DEFAULT_INTERVALS else "custom"))
         custom_var = tk.StringVar(value="" if self.capture_interval_seconds in DEFAULT_INTERVALS else str(self.capture_interval_seconds))
+        custom_entry = ttk.Entry(dialog, textvariable=custom_var, width=10)
+
+        def toggle_custom() -> None:
+            self._toggle_custom_state(selected_mode, custom_entry)
 
         ttk.Label(dialog, text="Choose interval:").grid(row=0, column=0, sticky="w", padx=12, pady=(12, 8))
 
-        custom_entry = ttk.Entry(dialog, textvariable=custom_var, width=10)
         row = 1
         for interval in DEFAULT_INTERVALS:
             ttk.Radiobutton(
@@ -85,7 +88,7 @@ class ChronoCameraApp:
                 text=f"{interval}s",
                 value=str(interval),
                 variable=selected_mode,
-                command=lambda entry=custom_entry: self._toggle_custom_state(selected_mode, entry),
+                command=toggle_custom,
             ).grid(row=row, column=0, sticky="w", padx=12)
             row += 1
 
@@ -94,7 +97,7 @@ class ChronoCameraApp:
             text="Custom (seconds):",
             value="custom",
             variable=selected_mode,
-            command=lambda entry=custom_entry: self._toggle_custom_state(selected_mode, entry),
+            command=toggle_custom,
         ).grid(row=row, column=0, sticky="w", padx=12, pady=(2, 0))
         custom_entry.grid(row=row, column=1, sticky="w", padx=(0, 12), pady=(2, 0))
 
@@ -172,7 +175,7 @@ class ChronoCameraApp:
         if filename:
             filename = Path(filename).stem
         else:
-            timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H%M%S%z")
+            timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             filename = f"chronocamera-{timestamp}"
 
         return str(save_dir / f"{filename}.mp4")
