@@ -55,6 +55,28 @@
     }
   }
 
+  async function discardCaptureSession() {
+    if (!captureSession || !captureSession.tempDir) return;
+    try {
+      await window.electronAPI.discardCaptureSession(captureSession.tempDir);
+    } catch (err) {
+      console.error('Failed to clean up capture session:', err);
+    } finally {
+      captureSession = null;
+    }
+  }
+
+  async function handleCaptureError(err, statusMessage = 'Capture failed. Recording stopped.') {
+    console.error('Frame capture failed:', err);
+    setStatus(statusMessage);
+    alert(`Capture failed: ${err.message || err}`);
+    recording = false;
+    recordBtn.textContent = 'Start Recording';
+    recordBtn.classList.remove('recording');
+    stopCapture();
+    await discardCaptureSession();
+  }
+
   function setStatus(text) {
     statusBar.textContent = text;
   }
@@ -123,15 +145,7 @@
     recordingStartTime = Date.now();
     await captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
     captureTimerId = setInterval(() => {
-      captureFrame().catch((err) => {
-        console.error('Frame capture failed:', err);
-        setStatus('Capture failed. Recording stopped.');
-        alert(`Capture failed: ${err.message || err}`);
-        recording = false;
-        recordBtn.textContent = 'Start Recording';
-        recordBtn.classList.remove('recording');
-        stopCapture();
-      });
+      captureFrame().catch((err) => handleCaptureError(err));
     }, captureIntervalSeconds * 1000);
     captureProgressContainer.classList.remove('hidden');
     startProgressAnimation();
@@ -189,7 +203,7 @@
         recording = false;
         recordBtn.textContent = 'Start Recording';
         recordBtn.classList.remove('recording');
-        captureSession = null;
+        await discardCaptureSession();
         setStatus('Failed to start recording.');
         alert(`Could not start recording: ${err.message || err}`);
       }
@@ -200,7 +214,7 @@
       stopCapture();
 
       if (!captureSession || captureSession.frameCount === 0) {
-        captureSession = null;
+        await discardCaptureSession();
         setStatus('No frames captured.');
         alert('No frames were captured during this recording.');
         return;

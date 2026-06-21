@@ -189,6 +189,16 @@ ipcMain.handle('save-capture-frame', async (_event, { tempDir, frameIndex, dataU
   }
 });
 
+// IPC: discard temp capture session without encoding
+ipcMain.handle('discard-capture-session', async (_event, tempDir) => {
+  if (!tempDir || typeof tempDir !== 'string') {
+    return { success: false, error: 'Invalid capture session directory.' };
+  }
+
+  await removeDirRecursive(tempDir);
+  return { success: true };
+});
+
 // IPC: Encode frames to mp4
 ipcMain.handle('encode-video', async (_event, { frames, tempDir, frameCount, saveDir, filename }) => {
   const hasTempFrames = tempDir && Number.isInteger(frameCount) && frameCount > 0;
