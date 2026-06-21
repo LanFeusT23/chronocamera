@@ -9,6 +9,7 @@ const http = require('http');
 
 let mainWindow;
 let customFfmpegPath = null;
+const tempRootDir = path.resolve(os.tmpdir());
 
 // Path to store settings
 const settingsPath = path.join(app.getPath('userData'), 'settings.json');
@@ -171,6 +172,9 @@ ipcMain.handle('save-capture-frame', async (_event, { tempDir, frameIndex, dataU
   if (!tempDir || typeof tempDir !== 'string') {
     return { success: false, error: 'Invalid capture session directory.' };
   }
+  if (!isValidCaptureTempDir(tempDir)) {
+    return { success: false, error: 'Unsafe capture session directory.' };
+  }
   if (!Number.isInteger(frameIndex) || frameIndex < 0) {
     return { success: false, error: 'Invalid frame index.' };
   }
@@ -194,6 +198,9 @@ ipcMain.handle('discard-capture-session', async (_event, tempDir) => {
   if (!tempDir || typeof tempDir !== 'string') {
     return { success: false, error: 'Invalid capture session directory.' };
   }
+  if (!isValidCaptureTempDir(tempDir)) {
+    return { success: false, error: 'Unsafe capture session directory.' };
+  }
 
   await removeDirRecursive(tempDir);
   return { success: true };
@@ -201,7 +208,11 @@ ipcMain.handle('discard-capture-session', async (_event, tempDir) => {
 
 // IPC: Encode frames to mp4
 ipcMain.handle('encode-video', async (_event, { frames, tempDir, frameCount, saveDir, filename }) => {
-  const hasTempFrames = tempDir && Number.isInteger(frameCount) && frameCount > 0;
+  if (tempDir && !isValidCaptureTempDir(tempDir)) {
+    return { success: false, error: 'Unsafe capture session directory.' };
+  }
+
+  const hasTempFrames = isValidCaptureTempDir(tempDir) && Number.isInteger(frameCount) && frameCount > 0;
   const hasMemoryFrames = Array.isArray(frames) && frames.length > 0;
 
   if (!hasTempFrames && !hasMemoryFrames) {
@@ -378,7 +389,14 @@ function findFile(dir, filename) {
 }
 
 async function removeDirRecursive(dirPath) {
+  if (!isValidCaptureTempDir(dirPath)) return;
   try {
     await fsp.rm(dirPath, { recursive: true, force: true });
   } catch { /* ignore cleanup errors */ }
+}
+
+function isValidCaptureTempDir(dirPath) {
+  if (!dirPath || typeof dirPath !== 'string') return false;
+  const resolvedPath = path.resolve(dirPath);
+  return resolvedPath.startsWith(`${tempRootDir}${path.sep}`) && path.basename(resolvedPath).startsWith('chronocamera-');
 }
