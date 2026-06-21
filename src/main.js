@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const os = require('os');
 const { spawn } = require('child_process');
 const https = require('https');
@@ -159,10 +160,41 @@ ipcMain.handle('select-directory', async () => {
   return result.filePaths[0];
 });
 
+// IPC: create temp capture session for incremental frame writes
+ipcMain.handle('create-capture-session', async () => {
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'chronocamera-'));
+  return { tempDir };
+});
+
+// IPC: save a single captured frame to temp session directory
+ipcMain.handle('save-capture-frame', async (_event, { tempDir, frameIndex, dataUrl }) => {
+  if (!tempDir || typeof tempDir !== 'string') {
+    return { success: false, error: 'Invalid capture session directory.' };
+  }
+  if (!Number.isInteger(frameIndex) || frameIndex < 0) {
+    return { success: false, error: 'Invalid frame index.' };
+  }
+  if (!dataUrl || typeof dataUrl !== 'string') {
+    return { success: false, error: 'Invalid frame data.' };
+  }
+
+  const framePath = path.join(tempDir, `frame-${String(frameIndex).padStart(6, '0')}.png`);
+  const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+
+  try {
+    await fsp.writeFile(framePath, Buffer.from(base64Data, 'base64'));
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to save captured frame.' };
+  }
+});
+
 // IPC: Encode frames to mp4
-ipcMain.handle('encode-video', async (_event, { frames, saveDir, filename }) => {
-  // frames is an array of base64-encoded PNG data URIs
-  if (!frames || frames.length === 0) {
+ipcMain.handle('encode-video', async (_event, { frames, tempDir, frameCount, saveDir, filename }) => {
+  const hasTempFrames = tempDir && Number.isInteger(frameCount) && frameCount > 0;
+  const hasMemoryFrames = Array.isArray(frames) && frames.length > 0;
+
+  if (!hasTempFrames && !hasMemoryFrames) {
     return { success: false, error: 'No frames captured.' };
   }
 
@@ -183,29 +215,26 @@ ipcMain.handle('encode-video', async (_event, { frames, saveDir, filename }) => 
   }
 
   const outputPath = path.join(saveDir, outputName);
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chronocamera-'));
+  const workingTempDir = hasTempFrames ? tempDir : fs.mkdtempSync(path.join(os.tmpdir(), 'chronocamera-'));
 
   try {
-    // Write frames as numbered PNGs
-    for (let i = 0; i < frames.length; i++) {
-      const base64Data = frames[i].replace(/^data:image\/png;base64,/, '');
-      const framePath = path.join(tempDir, `frame-${String(i).padStart(6, '0')}.png`);
-      fs.writeFileSync(framePath, Buffer.from(base64Data, 'base64'));
+    // Backward-compatible path: write in-memory frames to a temp directory.
+    if (hasMemoryFrames) {
+      for (let i = 0; i < frames.length; i++) {
+        const base64Data = frames[i].replace(/^data:image\/png;base64,/, '');
+        const framePath = path.join(workingTempDir, `frame-${String(i).padStart(6, '0')}.png`);
+        fs.writeFileSync(framePath, Buffer.from(base64Data, 'base64'));
+      }
     }
 
     // Encode with FFmpeg
-    await runFFmpeg(tempDir, outputPath);
+    await runFFmpeg(workingTempDir, outputPath);
 
     return { success: true, outputPath };
   } catch (err) {
     return { success: false, error: err.message || 'FFmpeg encoding failed.' };
   } finally {
-    // Cleanup temp frames
-    try {
-      const tempFiles = fs.readdirSync(tempDir);
-      for (const f of tempFiles) fs.unlinkSync(path.join(tempDir, f));
-      fs.rmdirSync(tempDir);
-    } catch { /* ignore cleanup errors */ }
+    await removeDirRecursive(workingTempDir);
   }
 });
 
@@ -336,4 +365,10 @@ function findFile(dir, filename) {
     }
   }
   return null;
+}
+
+async function removeDirRecursive(dirPath) {
+  try {
+    await fsp.rm(dirPath, { recursive: true, force: true });
+  } catch { /* ignore cleanup errors */ }
 }

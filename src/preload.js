@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  createCaptureSession: () => ipcRenderer.invoke('create-capture-session'),
+  saveCaptureFrame: (data) => ipcRenderer.invoke('save-capture-frame', data),
   encodeVideo: (data) => ipcRenderer.invoke('encode-video', data),
   checkFfmpeg: () => ipcRenderer.invoke('check-ffmpeg'),
   getPlatformInfo: () => ipcRenderer.invoke('get-platform-info'),

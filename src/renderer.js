@@ -26,13 +26,14 @@
   // State
   let captureIntervalSeconds = DEFAULT_INTERVALS[0];
   let recording = false;
-  let capturedFrames = [];
+  let captureSession = null;
   let captureTimerId = null;
   let stream = null;
   let timestampOverlayEnabled = false;
   let recordingStartTime = null;
   let lastCaptureTime = null;
   let progressRafId = null;
+  let captureFrameInFlight = false;
 
   // Canvas context for frame capture
   canvasEl.width = EXPORT_WIDTH;
@@ -59,18 +60,34 @@
   }
 
   // Frame capture
-  function captureFrame() {
-    if (!stream || !videoEl.videoWidth) return;
-    ctx.drawImage(videoEl, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
+  async function captureFrame() {
+    if (captureFrameInFlight || !captureSession || !stream || !videoEl.videoWidth) return;
+    captureFrameInFlight = true;
+    try {
+      ctx.drawImage(videoEl, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
 
-    if (timestampOverlayEnabled) {
-      drawTimestamp();
+      if (timestampOverlayEnabled) {
+        drawTimestamp();
+      }
+
+      const dataUrl = canvasEl.toDataURL('image/png');
+      const frameIndex = captureSession.frameCount;
+      const result = await window.electronAPI.saveCaptureFrame({
+        tempDir: captureSession.tempDir,
+        frameIndex,
+        dataUrl,
+      });
+
+      if (result.success) {
+        captureSession.frameCount += 1;
+        setStatus(`Recording timelapse... Frames: ${captureSession.frameCount}`);
+        lastCaptureTime = Date.now();
+      } else {
+        throw new Error(result.error || 'Failed to save captured frame.');
+      }
+    } finally {
+      captureFrameInFlight = false;
     }
-
-    const dataUrl = canvasEl.toDataURL('image/png');
-    capturedFrames.push(dataUrl);
-    setStatus(`Recording timelapse... Frames: ${capturedFrames.length}`);
-    lastCaptureTime = Date.now();
   }
 
   function drawTimestamp() {
@@ -100,11 +117,22 @@
     ctx.fillText(text, EXPORT_WIDTH - padding, padding);
   }
 
-  function startCapture() {
-    capturedFrames = [];
+  async function startCapture() {
+    const session = await window.electronAPI.createCaptureSession();
+    captureSession = { tempDir: session.tempDir, frameCount: 0 };
     recordingStartTime = Date.now();
-    captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
-    captureTimerId = setInterval(captureFrame, captureIntervalSeconds * 1000);
+    await captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
+    captureTimerId = setInterval(() => {
+      captureFrame().catch((err) => {
+        console.error('Frame capture failed:', err);
+        setStatus('Capture failed. Recording stopped.');
+        alert(`Capture failed: ${err.message || err}`);
+        recording = false;
+        recordBtn.textContent = 'Start Recording';
+        recordBtn.classList.remove('recording');
+        stopCapture();
+      });
+    }, captureIntervalSeconds * 1000);
     captureProgressContainer.classList.remove('hidden');
     startProgressAnimation();
   }
@@ -116,6 +144,7 @@
     }
     recordingStartTime = null;
     lastCaptureTime = null;
+    captureFrameInFlight = false;
     stopProgressAnimation();
     captureProgressContainer.classList.add('hidden');
     captureProgressBar.style.width = '0%';
@@ -154,14 +183,24 @@
       recordBtn.textContent = 'Stop Recording';
       recordBtn.classList.add('recording');
       setStatus('Recording timelapse...');
-      startCapture();
+      try {
+        await startCapture();
+      } catch (err) {
+        recording = false;
+        recordBtn.textContent = 'Start Recording';
+        recordBtn.classList.remove('recording');
+        captureSession = null;
+        setStatus('Failed to start recording.');
+        alert(`Could not start recording: ${err.message || err}`);
+      }
     } else {
       recording = false;
       recordBtn.textContent = 'Start Recording';
       recordBtn.classList.remove('recording');
       stopCapture();
 
-      if (capturedFrames.length === 0) {
+      if (!captureSession || captureSession.frameCount === 0) {
+        captureSession = null;
         setStatus('No frames captured.');
         alert('No frames were captured during this recording.');
         return;
@@ -171,7 +210,8 @@
       recordBtn.disabled = true;
 
       const result = await window.electronAPI.encodeVideo({
-        frames: capturedFrames,
+        tempDir: captureSession.tempDir,
+        frameCount: captureSession.frameCount,
         saveDir: saveDirInput.value.trim(),
         filename: filenameInput.value.trim(),
       });
@@ -186,7 +226,7 @@
         alert(`Save failed: ${result.error}`);
       }
 
-      capturedFrames = [];
+      captureSession = null;
     }
   });
 
