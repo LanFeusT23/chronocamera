@@ -145,7 +145,11 @@
     recordingStartTime = Date.now();
     await captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
     captureTimerId = setInterval(() => {
-      captureFrame().catch((err) => handleCaptureError(err));
+      captureFrame().catch((err) => {
+        handleCaptureError(err).catch((cleanupErr) => {
+          console.error('Capture recovery failed:', cleanupErr);
+        });
+      });
     }, captureIntervalSeconds * 1000);
     captureProgressContainer.classList.remove('hidden');
     startProgressAnimation();

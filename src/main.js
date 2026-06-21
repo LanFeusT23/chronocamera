@@ -225,26 +225,26 @@ ipcMain.handle('encode-video', async (_event, { frames, tempDir, frameCount, sav
   }
 
   const outputPath = path.join(saveDir, outputName);
-  const workingTempDir = hasTempFrames ? tempDir : fs.mkdtempSync(path.join(os.tmpdir(), 'chronocamera-'));
+  const encodingTempDir = hasTempFrames ? tempDir : fs.mkdtempSync(path.join(os.tmpdir(), 'chronocamera-'));
 
   try {
     // Backward-compatible path: write in-memory frames to a temp directory.
     if (hasMemoryFrames) {
       for (let i = 0; i < frames.length; i++) {
         const base64Data = frames[i].replace(/^data:image\/png;base64,/, '');
-        const framePath = path.join(workingTempDir, `frame-${String(i).padStart(6, '0')}.png`);
+        const framePath = path.join(encodingTempDir, `frame-${String(i).padStart(6, '0')}.png`);
         fs.writeFileSync(framePath, Buffer.from(base64Data, 'base64'));
       }
     }
 
     // Encode with FFmpeg
-    await runFFmpeg(workingTempDir, outputPath);
+    await runFFmpeg(encodingTempDir, outputPath);
 
     return { success: true, outputPath };
   } catch (err) {
     return { success: false, error: err.message || 'FFmpeg encoding failed.' };
   } finally {
-    await removeDirRecursive(workingTempDir);
+    await removeDirRecursive(encodingTempDir);
   }
 });
 
