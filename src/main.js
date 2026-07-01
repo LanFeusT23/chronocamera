@@ -215,7 +215,8 @@ ipcMain.handle('create-timelapse', async (_event, { sessionPath }) => {
     const fp = path.join(sessionPath, f).replace(/\\/g, '/');
     return `file '${fp}'\nduration 0.3`;
   });
-  // Repeat last file without duration to prevent last-frame truncation
+  // Repeat the last file without a duration directive so FFmpeg renders it for
+  // the full 0.3s instead of discarding it (required by the concat demuxer)
   const lastFp = path.join(sessionPath, files[files.length - 1]).replace(/\\/g, '/');
   entries.push(`file '${lastFp}'`);
   fs.writeFileSync(filelistPath, entries.join('\n') + '\n');
