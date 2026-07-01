@@ -106,6 +106,23 @@ button:active {
   color: #fff;
 }
 
+#timelapse-btn {
+  background: #27ae60;
+  border-color: #2ecc71;
+  color: #fff;
+}
+
+#timelapse-btn:hover {
+  background: #2ecc71;
+}
+
+#timelapse-btn:disabled {
+  background: #3a3a3a;
+  border-color: #555;
+  color: #888;
+  cursor: not-allowed;
+}
+
 #interval-label {
   font-size: 14px;
   color: #aaa;

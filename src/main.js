@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { spawn } = require('child_process');
 const https = require('https');
 const http = require('http');
@@ -159,63 +158,85 @@ ipcMain.handle('select-directory', async () => {
   return result.filePaths[0];
 });
 
-// IPC: Encode frames to mp4
-ipcMain.handle('encode-video', async (_event, { frames, saveDir, filename }) => {
-  // frames is an array of base64-encoded PNG data URIs
-  if (!frames || frames.length === 0) {
-    return { success: false, error: 'No frames captured.' };
-  }
-
-  // Validate save directory
+// IPC: Start a new recording session (creates the session folder on disk)
+ipcMain.handle('start-recording-session', async (_event, { saveDir, filename }) => {
   if (!saveDir || !fs.existsSync(saveDir)) {
     return { success: false, error: 'Invalid save directory.' };
   }
 
-  // Build output filename
-  let outputName;
-  if (filename && filename.trim()) {
-    // Strip any extension and force .mp4
-    outputName = path.parse(filename.trim()).name + '.mp4';
-  } else {
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-    outputName = `chronocamera-${timestamp}.mp4`;
-  }
-
-  const outputPath = path.join(saveDir, outputName);
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chronocamera-'));
+  const baseName = (filename && filename.trim()) ? path.parse(filename.trim()).name : 'chronocamera';
+  const startDate = new Date().toISOString().replace(/:/g, '-');
+  const sessionFolderName = `${baseName}_${startDate}`;
+  const sessionPath = path.join(saveDir, sessionFolderName);
 
   try {
-    // Write frames as numbered PNGs
-    for (let i = 0; i < frames.length; i++) {
-      const base64Data = frames[i].replace(/^data:image\/png;base64,/, '');
-      const framePath = path.join(tempDir, `frame-${String(i).padStart(6, '0')}.png`);
-      fs.writeFileSync(framePath, Buffer.from(base64Data, 'base64'));
-    }
+    fs.mkdirSync(sessionPath, { recursive: true });
+    return { success: true, sessionPath, baseName };
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to create session folder.' };
+  }
+});
 
-    // Encode with FFmpeg
-    await runFFmpeg(tempDir, outputPath);
+// IPC: Save a single snapshot JPEG to the session folder
+ipcMain.handle('save-snapshot', async (_event, { sessionPath, baseName, imageData, captureDate }) => {
+  try {
+    const safeDate = captureDate.replace(/:/g, '-');
+    const fileName = `${baseName}_${safeDate}.jpg`;
+    const filePath = path.join(sessionPath, fileName);
+    const base64Data = imageData.replace(/^data:image\/jpeg;base64,/, '');
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    return { success: true, filePath };
+  } catch (err) {
+    return { success: false, error: err.message || 'Failed to save snapshot.' };
+  }
+});
 
+// IPC: Create a timelapse video from the images in a session folder
+ipcMain.handle('create-timelapse', async (_event, { sessionPath }) => {
+  if (!sessionPath || !fs.existsSync(sessionPath)) {
+    return { success: false, error: 'Session folder not found.' };
+  }
+
+  const files = fs.readdirSync(sessionPath)
+    .filter(f => f.toLowerCase().endsWith('.jpg'))
+    .sort();
+
+  if (files.length === 0) {
+    return { success: false, error: 'No images found in session folder.' };
+  }
+
+  const saveDir = path.dirname(sessionPath);
+  const outputName = path.basename(sessionPath) + '.mp4';
+  const outputPath = path.join(saveDir, outputName);
+  const filelistPath = path.join(sessionPath, 'filelist.txt');
+
+  // Build concat filelist with 0.3s duration per frame
+  const entries = files.map(f => {
+    const fp = path.join(sessionPath, f).replace(/\\/g, '/');
+    return `file '${fp}'\nduration 0.3`;
+  });
+  // Repeat last file without duration to prevent last-frame truncation
+  const lastFp = path.join(sessionPath, files[files.length - 1]).replace(/\\/g, '/');
+  entries.push(`file '${lastFp}'`);
+  fs.writeFileSync(filelistPath, entries.join('\n') + '\n');
+
+  try {
+    await runFFmpegFromFilelist(filelistPath, outputPath);
     return { success: true, outputPath };
   } catch (err) {
     return { success: false, error: err.message || 'FFmpeg encoding failed.' };
   } finally {
-    // Cleanup temp frames
-    try {
-      const tempFiles = fs.readdirSync(tempDir);
-      for (const f of tempFiles) fs.unlinkSync(path.join(tempDir, f));
-      fs.rmdirSync(tempDir);
-    } catch { /* ignore cleanup errors */ }
+    try { fs.unlinkSync(filelistPath); } catch { /* ignore */ }
   }
 });
 
-function runFFmpeg(inputDir, outputPath) {
+function runFFmpegFromFilelist(filelistPath, outputPath) {
   return new Promise((resolve, reject) => {
-    const inputPattern = path.join(inputDir, 'frame-%06d.png');
     const args = [
       '-y',
-      '-framerate', '1/0.3', // Each input frame is displayed for 0.3 seconds
-      '-i', inputPattern,
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', filelistPath,
       '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
