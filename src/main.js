@@ -55,6 +55,7 @@ function createWindow() {
     height: 780,
     minWidth: 900,
     minHeight: 640,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
