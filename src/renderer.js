@@ -10,6 +10,7 @@
   const videoEl = document.getElementById('webcam-preview');
   const canvasEl = document.getElementById('capture-canvas');
   const recordBtn = document.getElementById('record-btn');
+  const timelapseBtn = document.getElementById('timelapse-btn');
   const settingsBtn = document.getElementById('settings-btn');
   const intervalLabel = document.getElementById('interval-label');
   const saveDirInput = document.getElementById('save-dir');
@@ -26,13 +27,17 @@
   // State
   let captureIntervalSeconds = DEFAULT_INTERVALS[0];
   let recording = false;
-  let capturedFrames = [];
   let captureTimerId = null;
+  let captureBusy = false;
   let stream = null;
   let timestampOverlayEnabled = false;
   let recordingStartTime = null;
   let lastCaptureTime = null;
   let progressRafId = null;
+  let sessionPath = null;
+  let sessionBaseName = null;
+  let sessionSaveDir = null;
+  let sessionSnapshotCount = 0;
 
   // Canvas context for frame capture
   canvasEl.width = EXPORT_WIDTH;
@@ -58,19 +63,38 @@
     statusBar.textContent = text;
   }
 
-  // Frame capture
-  function captureFrame() {
-    if (!stream || !videoEl.videoWidth) return;
-    ctx.drawImage(videoEl, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
+  // Frame capture — saves snapshot as JPEG to the session folder on disk
+  async function captureFrame() {
+    if (captureBusy || !stream || !videoEl.videoWidth) return;
+    captureBusy = true;
+    try {
+      ctx.drawImage(videoEl, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
 
-    if (timestampOverlayEnabled) {
-      drawTimestamp();
+      if (timestampOverlayEnabled) {
+        drawTimestamp();
+      }
+
+      const captureDate = new Date().toISOString();
+      const imageData = canvasEl.toDataURL('image/jpeg', 0.92);
+
+      const result = await window.electronAPI.saveSnapshot({
+        sessionPath,
+        baseName: sessionBaseName,
+        imageData,
+        captureDate,
+      });
+
+      if (result.success) {
+        sessionSnapshotCount++;
+        setStatus(`Recording... ${sessionSnapshotCount} snapshot${sessionSnapshotCount !== 1 ? 's' : ''} saved`);
+      } else {
+        console.error('Snapshot save failed:', result.error);
+      }
+
+      lastCaptureTime = Date.now();
+    } finally {
+      captureBusy = false;
     }
-
-    const dataUrl = canvasEl.toDataURL('image/png');
-    capturedFrames.push(dataUrl);
-    setStatus(`Recording timelapse... Frames: ${capturedFrames.length}`);
-    lastCaptureTime = Date.now();
   }
 
   function drawTimestamp() {
@@ -100,11 +124,31 @@
     ctx.fillText(text, EXPORT_WIDTH - padding, padding);
   }
 
-  function startCapture() {
-    capturedFrames = [];
+  async function startCapture() {
+    sessionSnapshotCount = 0;
     recordingStartTime = Date.now();
-    captureFrame(); // Capture first frame immediately (sets lastCaptureTime)
-    captureTimerId = setInterval(captureFrame, captureIntervalSeconds * 1000);
+    lastCaptureTime = null;
+
+    const result = await window.electronAPI.startRecordingSession({
+      saveDir: sessionSaveDir,
+      filename: filenameInput.value.trim(),
+    });
+
+    if (!result.success) {
+      setStatus(`Failed to start session: ${result.error}`);
+      alert(`Could not create session folder:\n${result.error}`);
+      recording = false;
+      recordBtn.textContent = 'Start Recording';
+      recordBtn.classList.remove('recording');
+      return;
+    }
+
+    sessionPath = result.sessionPath;
+    sessionBaseName = result.baseName;
+
+    // Capture first frame immediately, then on interval
+    await captureFrame();
+    captureTimerId = setInterval(() => { captureFrame(); }, captureIntervalSeconds * 1000);
     captureProgressContainer.classList.remove('hidden');
     startProgressAnimation();
   }
@@ -147,46 +191,56 @@
       // Validate save directory
       const saveDir = saveDirInput.value.trim();
       if (!saveDir) {
-        alert('Please select a directory to save the video.');
+        alert('Please select a directory to save the snapshots.');
         return;
       }
       recording = true;
+      sessionSaveDir = saveDir;
       recordBtn.textContent = 'Stop Recording';
       recordBtn.classList.add('recording');
-      setStatus('Recording timelapse...');
-      startCapture();
+      timelapseBtn.classList.add('hidden');
+      setStatus('Starting recording session...');
+      await startCapture();
     } else {
       recording = false;
       recordBtn.textContent = 'Start Recording';
       recordBtn.classList.remove('recording');
       stopCapture();
 
-      if (capturedFrames.length === 0) {
-        setStatus('No frames captured.');
-        alert('No frames were captured during this recording.');
+      if (sessionSnapshotCount === 0) {
+        setStatus('No snapshots captured.');
+        alert('No snapshots were captured during this recording.');
         return;
       }
 
-      setStatus('Encoding video...');
-      recordBtn.disabled = true;
+      setStatus(`Recording stopped — ${sessionSnapshotCount} snapshot${sessionSnapshotCount !== 1 ? 's' : ''} saved to: ${sessionPath}`);
+      timelapseBtn.classList.remove('hidden');
+    }
+  });
 
-      const result = await window.electronAPI.encodeVideo({
-        frames: capturedFrames,
-        saveDir: saveDirInput.value.trim(),
-        filename: filenameInput.value.trim(),
-      });
+  // Create Timelapse button
+  timelapseBtn.addEventListener('click', async () => {
+    if (!sessionPath) {
+      alert('No recording session found.');
+      return;
+    }
 
-      recordBtn.disabled = false;
+    timelapseBtn.disabled = true;
+    recordBtn.disabled = true;
+    setStatus('Creating timelapse video...');
 
-      if (result.success) {
-        setStatus(`Saved: ${result.outputPath}`);
-        alert(`Timelapse saved to:\n${result.outputPath}`);
-      } else {
-        setStatus('Failed to save video.');
-        alert(`Save failed: ${result.error}`);
-      }
+    const result = await window.electronAPI.createTimelapse({ sessionPath });
 
-      capturedFrames = [];
+    timelapseBtn.disabled = false;
+    recordBtn.disabled = false;
+
+    if (result.success) {
+      setStatus(`Timelapse saved: ${result.outputPath}`);
+      alert(`Timelapse video saved to:\n${result.outputPath}`);
+      timelapseBtn.classList.add('hidden');
+    } else {
+      setStatus('Failed to create timelapse.');
+      alert(`Timelapse creation failed:\n${result.error}`);
     }
   });
 
