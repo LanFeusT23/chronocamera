@@ -2,11 +2,13 @@
 (function () {
   'use strict';
 
-  const DEFAULT_INTERVALS = [2, 5, 10, 30, 60];
-  const DEFAULT_FRAME_DURATIONS = [0.1, 0.2, 0.3, 0.5, 1.0];
   const DEFAULT_FRAME_DURATION = 0.3;
   const EXPORT_WIDTH = 1920;
   const EXPORT_HEIGHT = 1080;
+
+  function formatFrameDuration(value) {
+    return `${parseFloat(value).toFixed(2).replace(/\.?0+$/, '')}s`;
+  }
 
   // DOM elements
   const videoEl = document.getElementById('webcam-preview');
@@ -29,8 +31,10 @@
   const settingsModal = document.getElementById('settings-modal');
   const settingsSaveBtn = document.getElementById('settings-save-btn');
   const settingsCancelBtn = document.getElementById('settings-cancel-btn');
-  const customIntervalInput = document.getElementById('custom-interval');
-  const customSpeedInput = document.getElementById('custom-speed');
+  const intervalSlider = document.getElementById('interval-slider');
+  const intervalSliderValue = document.getElementById('interval-slider-value');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedSliderValue = document.getElementById('speed-slider-value');
 
   // State
   let captureIntervalSeconds = DEFAULT_INTERVALS[0];
@@ -291,96 +295,31 @@
 
   // Settings modal
   settingsBtn.addEventListener('click', () => {
-    // Sync capture interval to modal
-    const radios = settingsModal.querySelectorAll('input[name="interval"]');
-    let found = false;
-    radios.forEach((radio) => {
-      if (radio.value === String(captureIntervalSeconds)) {
-        radio.checked = true;
-        found = true;
-      } else if (radio.value === 'custom' && !found) {
-        // will handle below
-      } else {
-        radio.checked = false;
-      }
-    });
-    if (!found) {
-      const customRadio = settingsModal.querySelector('input[value="custom"]');
-      customRadio.checked = true;
-      customIntervalInput.value = captureIntervalSeconds;
-      customIntervalInput.disabled = false;
-    } else {
-      customIntervalInput.disabled = true;
-      customIntervalInput.value = '';
-    }
+    // Sync capture interval to slider
+    intervalSlider.value = captureIntervalSeconds;
+    intervalSliderValue.textContent = `${captureIntervalSeconds}s`;
 
-    // Sync frame duration to modal
-    const speedRadios = settingsModal.querySelectorAll('input[name="frame-duration"]');
-    let speedFound = false;
-    speedRadios.forEach((radio) => {
-      if (radio.value !== 'custom-speed' && parseFloat(radio.value) === frameDurationSeconds) {
-        radio.checked = true;
-        speedFound = true;
-      } else if (radio.value !== 'custom-speed') {
-        radio.checked = false;
-      }
-    });
-    if (!speedFound) {
-      const customSpeedRadio = settingsModal.querySelector('input[value="custom-speed"]');
-      customSpeedRadio.checked = true;
-      customSpeedInput.value = frameDurationSeconds;
-      customSpeedInput.disabled = false;
-    } else {
-      customSpeedInput.disabled = true;
-      customSpeedInput.value = '';
-    }
+    // Sync frame duration to slider
+    speedSlider.value = frameDurationSeconds;
+    speedSliderValue.textContent = formatFrameDuration(frameDurationSeconds);
 
     // Sync timestamp overlay checkbox
     document.getElementById('timestamp-overlay').checked = timestampOverlayEnabled;
     settingsModal.classList.remove('hidden');
   });
 
-  // Toggle custom inputs when radio changes
-  settingsModal.addEventListener('change', (e) => {
-    if (e.target.name === 'interval') {
-      customIntervalInput.disabled = e.target.value !== 'custom';
-      if (e.target.value === 'custom') customIntervalInput.focus();
-    }
-    if (e.target.name === 'frame-duration') {
-      customSpeedInput.disabled = e.target.value !== 'custom-speed';
-      if (e.target.value === 'custom-speed') customSpeedInput.focus();
-    }
+  // Live-update slider value labels
+  intervalSlider.addEventListener('input', () => {
+    intervalSliderValue.textContent = `${intervalSlider.value}s`;
+  });
+
+  speedSlider.addEventListener('input', () => {
+    speedSliderValue.textContent = formatFrameDuration(speedSlider.value);
   });
 
   settingsSaveBtn.addEventListener('click', () => {
-    const selected = settingsModal.querySelector('input[name="interval"]:checked');
-    if (!selected) return;
-
-    if (selected.value === 'custom') {
-      const val = parseInt(customIntervalInput.value, 10);
-      if (!val || val <= 0) {
-        alert('Custom interval must be a positive integer (1 or greater).');
-        return;
-      }
-      captureIntervalSeconds = val;
-    } else {
-      captureIntervalSeconds = parseInt(selected.value, 10);
-    }
-
-    // Save frame duration setting
-    const selectedSpeed = settingsModal.querySelector('input[name="frame-duration"]:checked');
-    if (selectedSpeed) {
-      if (selectedSpeed.value === 'custom-speed') {
-        const val = parseFloat(customSpeedInput.value);
-        if (!val || val <= 0) {
-          alert('Custom frame duration must be a positive number.');
-          return;
-        }
-        frameDurationSeconds = val;
-      } else {
-        frameDurationSeconds = parseFloat(selectedSpeed.value);
-      }
-    }
+    captureIntervalSeconds = parseInt(intervalSlider.value, 10);
+    frameDurationSeconds = parseFloat(speedSlider.value);
 
     // Save timestamp overlay setting
     const timestampCheckbox = document.getElementById('timestamp-overlay');
