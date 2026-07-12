@@ -256,9 +256,66 @@ button:active {
   color: #bbb;
 }
 
-#ffmpeg-platform-info code {
-  background: #1e1e1e;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 12px;
+#open-folder-btn {
+  background: #1a3a5c;
+  border-color: #2a5a8c;
+  color: #e0e0e0;
+}
+
+#open-folder-btn:hover {
+  background: #2a5a8c;
+}
+
+#speed-label {
+  font-size: 14px;
+  color: #aaa;
+}
+
+#encode-progress-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+#encode-progress-bar-track {
+  flex: 1;
+  height: 20px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#encode-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #27ae60;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+#encode-progress-text {
+  font-size: 13px;
+  color: #aaa;
+  min-width: 36px;
+  text-align: right;
+}
+
+#speed-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+#speed-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+#custom-speed {
+  width: 80px;
+  margin-left: 24px;
 }

@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  openFolderForTimelapse: () => ipcRenderer.invoke('open-folder-for-timelapse'),
   startRecordingSession: (data) => ipcRenderer.invoke('start-recording-session', data),
   saveSnapshot: (data) => ipcRenderer.invoke('save-snapshot', data),
   createTimelapse: (data) => ipcRenderer.invoke('create-timelapse', data),
@@ -10,5 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   downloadFfmpeg: () => ipcRenderer.invoke('download-ffmpeg'),
   onFfmpegDownloadProgress: (callback) => {
     ipcRenderer.on('ffmpeg-download-progress', (_event, data) => callback(data));
+  },
+  onTimelapseProgress: (callback) => {
+    ipcRenderer.on('timelapse-progress', (_event, data) => callback(data));
   },
 });

@@ -3,6 +3,7 @@
   'use strict';
 
   const DEFAULT_INTERVALS = [2, 5, 10, 30, 60];
+  const DEFAULT_FRAME_DURATIONS = [0.1, 0.2, 0.3, 0.5, 1.0];
   const EXPORT_WIDTH = 1920;
   const EXPORT_HEIGHT = 1080;
 
@@ -11,21 +12,28 @@
   const canvasEl = document.getElementById('capture-canvas');
   const recordBtn = document.getElementById('record-btn');
   const timelapseBtn = document.getElementById('timelapse-btn');
+  const openFolderBtn = document.getElementById('open-folder-btn');
   const settingsBtn = document.getElementById('settings-btn');
   const intervalLabel = document.getElementById('interval-label');
+  const speedLabel = document.getElementById('speed-label');
   const saveDirInput = document.getElementById('save-dir');
   const browseBtn = document.getElementById('browse-btn');
   const filenameInput = document.getElementById('filename');
   const statusBar = document.getElementById('status-bar');
   const captureProgressContainer = document.getElementById('capture-progress-container');
   const captureProgressBar = document.getElementById('capture-progress-bar');
+  const encodeProgressContainer = document.getElementById('encode-progress-container');
+  const encodeProgressBar = document.getElementById('encode-progress-bar');
+  const encodeProgressText = document.getElementById('encode-progress-text');
   const settingsModal = document.getElementById('settings-modal');
   const settingsSaveBtn = document.getElementById('settings-save-btn');
   const settingsCancelBtn = document.getElementById('settings-cancel-btn');
   const customIntervalInput = document.getElementById('custom-interval');
+  const customSpeedInput = document.getElementById('custom-speed');
 
   // State
   let captureIntervalSeconds = DEFAULT_INTERVALS[0];
+  let frameDurationSeconds = 0.3;
   let recording = false;
   let captureTimerId = null;
   let captureBusy = false;
@@ -227,12 +235,18 @@
 
     timelapseBtn.disabled = true;
     recordBtn.disabled = true;
+    openFolderBtn.disabled = true;
+    encodeProgressContainer.classList.remove('hidden');
+    encodeProgressBar.style.width = '0%';
+    encodeProgressText.textContent = '0%';
     setStatus('Creating timelapse video...');
 
-    const result = await window.electronAPI.createTimelapse({ sessionPath });
+    const result = await window.electronAPI.createTimelapse({ sessionPath, frameDuration: frameDurationSeconds });
 
+    encodeProgressContainer.classList.add('hidden');
     timelapseBtn.disabled = false;
     recordBtn.disabled = false;
+    openFolderBtn.disabled = false;
 
     if (result.success) {
       setStatus(`Timelapse saved: ${result.outputPath}`);
@@ -244,6 +258,29 @@
     }
   });
 
+  // Open existing folder of images for timelapse reprocessing
+  openFolderBtn.addEventListener('click', async () => {
+    const info = await window.electronAPI.openFolderForTimelapse();
+    if (!info) return;
+
+    if (info.imageCount === 0) {
+      alert('No images (JPG/JPEG/PNG) found in the selected folder.');
+      return;
+    }
+
+    sessionPath = info.folderPath;
+    sessionBaseName = null;
+    sessionSnapshotCount = info.imageCount;
+    setStatus(`Opened folder: ${info.imageCount} image${info.imageCount !== 1 ? 's' : ''} found — ${info.folderPath}`);
+    timelapseBtn.classList.remove('hidden');
+  });
+
+  // Listen for encoding progress events
+  window.electronAPI.onTimelapseProgress((data) => {
+    encodeProgressBar.style.width = `${data.percent}%`;
+    encodeProgressText.textContent = `${data.percent}%`;
+  });
+
   // Browse directory
   browseBtn.addEventListener('click', async () => {
     const dir = await window.electronAPI.selectDirectory();
@@ -252,7 +289,7 @@
 
   // Settings modal
   settingsBtn.addEventListener('click', () => {
-    // Sync current state to modal
+    // Sync capture interval to modal
     const radios = settingsModal.querySelectorAll('input[name="interval"]');
     let found = false;
     radios.forEach((radio) => {
@@ -274,16 +311,42 @@
       customIntervalInput.disabled = true;
       customIntervalInput.value = '';
     }
+
+    // Sync frame duration to modal
+    const speedRadios = settingsModal.querySelectorAll('input[name="frame-duration"]');
+    let speedFound = false;
+    speedRadios.forEach((radio) => {
+      if (radio.value !== 'custom-speed' && parseFloat(radio.value) === frameDurationSeconds) {
+        radio.checked = true;
+        speedFound = true;
+      } else if (radio.value !== 'custom-speed') {
+        radio.checked = false;
+      }
+    });
+    if (!speedFound) {
+      const customSpeedRadio = settingsModal.querySelector('input[value="custom-speed"]');
+      customSpeedRadio.checked = true;
+      customSpeedInput.value = frameDurationSeconds;
+      customSpeedInput.disabled = false;
+    } else {
+      customSpeedInput.disabled = true;
+      customSpeedInput.value = '';
+    }
+
     // Sync timestamp overlay checkbox
     document.getElementById('timestamp-overlay').checked = timestampOverlayEnabled;
     settingsModal.classList.remove('hidden');
   });
 
-  // Toggle custom input when radio changes
+  // Toggle custom inputs when radio changes
   settingsModal.addEventListener('change', (e) => {
     if (e.target.name === 'interval') {
       customIntervalInput.disabled = e.target.value !== 'custom';
       if (e.target.value === 'custom') customIntervalInput.focus();
+    }
+    if (e.target.name === 'frame-duration') {
+      customSpeedInput.disabled = e.target.value !== 'custom-speed';
+      if (e.target.value === 'custom-speed') customSpeedInput.focus();
     }
   });
 
@@ -302,11 +365,27 @@
       captureIntervalSeconds = parseInt(selected.value, 10);
     }
 
+    // Save frame duration setting
+    const selectedSpeed = settingsModal.querySelector('input[name="frame-duration"]:checked');
+    if (selectedSpeed) {
+      if (selectedSpeed.value === 'custom-speed') {
+        const val = parseFloat(customSpeedInput.value);
+        if (!val || val <= 0) {
+          alert('Custom frame duration must be a positive number.');
+          return;
+        }
+        frameDurationSeconds = val;
+      } else {
+        frameDurationSeconds = parseFloat(selectedSpeed.value);
+      }
+    }
+
     // Save timestamp overlay setting
     const timestampCheckbox = document.getElementById('timestamp-overlay');
     timestampOverlayEnabled = timestampCheckbox.checked;
 
     intervalLabel.textContent = `Interval: ${captureIntervalSeconds}s`;
+    speedLabel.textContent = `Frame: ${frameDurationSeconds}s`;
     settingsModal.classList.add('hidden');
   });
 

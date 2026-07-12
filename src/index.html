@@ -18,8 +18,10 @@
       <div id="controls-row-1">
         <button id="record-btn">Start Recording</button>
         <button id="timelapse-btn" class="hidden">Create Timelapse</button>
+        <button id="open-folder-btn">Open Folder</button>
         <button id="settings-btn">Settings</button>
         <span id="interval-label">Interval: 2s</span>
+        <span id="speed-label">Frame: 0.3s</span>
       </div>
 
       <div id="controls-row-2">
@@ -36,6 +38,13 @@
 
     <div id="capture-progress-container" class="hidden">
       <div id="capture-progress-bar"></div>
+    </div>
+
+    <div id="encode-progress-container" class="hidden">
+      <div id="encode-progress-bar-track">
+        <div id="encode-progress-bar"></div>
+      </div>
+      <span id="encode-progress-text">0%</span>
     </div>
 
     <div id="status-bar">Idle</div>
@@ -57,6 +66,17 @@
       <hr style="border-color: #444; margin: 16px 0;" />
       <div id="overlay-options">
         <label><input type="checkbox" id="timestamp-overlay" /> Embed timer on video (top-right)</label>
+      </div>
+      <hr style="border-color: #444; margin: 16px 0;" />
+      <div id="speed-options">
+        <p style="margin-bottom: 8px; font-size: 13px; color: #aaa;">Frame duration (seconds per frame in output video):</p>
+        <label><input type="radio" name="frame-duration" value="0.1" /> 0.1s (fast)</label>
+        <label><input type="radio" name="frame-duration" value="0.2" /> 0.2s</label>
+        <label><input type="radio" name="frame-duration" value="0.3" checked /> 0.3s (default)</label>
+        <label><input type="radio" name="frame-duration" value="0.5" /> 0.5s</label>
+        <label><input type="radio" name="frame-duration" value="1.0" /> 1.0s (slow)</label>
+        <label><input type="radio" name="frame-duration" value="custom-speed" /> Custom:</label>
+        <input type="number" id="custom-speed" min="0.05" step="0.05" disabled placeholder="seconds" />
       </div>
       <div class="modal-buttons">
         <button id="settings-save-btn">Save</button>
