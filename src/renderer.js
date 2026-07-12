@@ -4,6 +4,7 @@
 
   const DEFAULT_INTERVALS = [2, 5, 10, 30, 60];
   const DEFAULT_FRAME_DURATIONS = [0.1, 0.2, 0.3, 0.5, 1.0];
+  const DEFAULT_FRAME_DURATION = 0.3;
   const EXPORT_WIDTH = 1920;
   const EXPORT_HEIGHT = 1080;
 
@@ -33,7 +34,7 @@
 
   // State
   let captureIntervalSeconds = DEFAULT_INTERVALS[0];
-  let frameDurationSeconds = 0.3;
+  let frameDurationSeconds = DEFAULT_FRAME_DURATION;
   let recording = false;
   let captureTimerId = null;
   let captureBusy = false;
@@ -269,7 +270,7 @@
     }
 
     sessionPath = info.folderPath;
-    sessionBaseName = null;
+    sessionBaseName = info.folderPath.replace(/\\/g, '/').split('/').pop() || info.folderPath;
     sessionSnapshotCount = info.imageCount;
     setStatus(`Opened folder: ${info.imageCount} image${info.imageCount !== 1 ? 's' : ''} found — ${info.folderPath}`);
     timelapseBtn.classList.remove('hidden');
@@ -277,8 +278,9 @@
 
   // Listen for encoding progress events
   window.electronAPI.onTimelapseProgress((data) => {
-    encodeProgressBar.style.width = `${data.percent}%`;
-    encodeProgressText.textContent = `${data.percent}%`;
+    const pct = Math.min(data.percent, 100);
+    encodeProgressBar.style.width = `${pct}%`;
+    encodeProgressText.textContent = `${pct}%`;
   });
 
   // Browse directory

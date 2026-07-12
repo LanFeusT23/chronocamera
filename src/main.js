@@ -5,6 +5,8 @@ const { spawn } = require('child_process');
 const https = require('https');
 const http = require('http');
 
+const OUTPUT_FPS = 30;
+
 let mainWindow;
 let customFfmpegPath = null;
 
@@ -243,7 +245,7 @@ ipcMain.handle('create-timelapse', async (_event, { sessionPath, frameDuration }
   fs.writeFileSync(filelistPath, entries.join('\n') + '\n');
 
   // Total output frames ≈ imageCount * frameDuration * outputFps
-  const totalOutputFrames = Math.round(files.length * duration * 30);
+  const totalOutputFrames = Math.round(files.length * duration * OUTPUT_FPS);
 
   try {
     await runFFmpegFromFilelist(filelistPath, outputPath, totalOutputFrames, (percent) => {
@@ -267,7 +269,7 @@ function runFFmpegFromFilelist(filelistPath, outputPath, totalOutputFrames, onPr
       '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-r', '30',
+      '-r', String(OUTPUT_FPS),
       '-preset', 'fast',
       '-progress', 'pipe:1',
       outputPath,
@@ -289,7 +291,7 @@ function runFFmpegFromFilelist(filelistPath, outputPath, totalOutputFrames, onPr
         for (const line of lines) {
           const m = line.match(/^frame=(\d+)/);
           if (m && totalOutputFrames > 0) {
-            const pct = Math.min(Math.round((parseInt(m[1], 10) / totalOutputFrames) * 100), 99);
+            const pct = Math.round((parseInt(m[1], 10) / totalOutputFrames) * 100);
             onProgress(pct);
           }
         }
