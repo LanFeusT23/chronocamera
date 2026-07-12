@@ -2,12 +2,15 @@
 (function () {
   'use strict';
 
+  const DEFAULT_INTERVAL = 2;
   const DEFAULT_FRAME_DURATION = 0.3;
   const EXPORT_WIDTH = 1920;
   const EXPORT_HEIGHT = 1080;
 
   function formatFrameDuration(value) {
-    return `${parseFloat(value).toFixed(2).replace(/\.?0+$/, '')}s`;
+    const numericValue = parseFloat(value);
+    const roundedValue = Math.round(numericValue * 100) / 100;
+    return `${roundedValue}s`;
   }
 
   // DOM elements
@@ -37,7 +40,7 @@
   const speedSliderValue = document.getElementById('speed-slider-value');
 
   // State
-  let captureIntervalSeconds = DEFAULT_INTERVALS[0];
+  let captureIntervalSeconds = DEFAULT_INTERVAL;
   let frameDurationSeconds = DEFAULT_FRAME_DURATION;
   let recording = false;
   let captureTimerId = null;
@@ -326,7 +329,7 @@
     timestampOverlayEnabled = timestampCheckbox.checked;
 
     intervalLabel.textContent = `Interval: ${captureIntervalSeconds}s`;
-    speedLabel.textContent = `Frame: ${frameDurationSeconds}s`;
+    speedLabel.textContent = `Frame: ${formatFrameDuration(frameDurationSeconds)}`;
     settingsModal.classList.add('hidden');
   });
 
