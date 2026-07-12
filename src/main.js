@@ -5,6 +5,8 @@ const { spawn } = require('child_process');
 const https = require('https');
 const http = require('http');
 
+const OUTPUT_FPS = 30;
+
 let mainWindow;
 let customFfmpegPath = null;
 
@@ -192,14 +194,34 @@ ipcMain.handle('save-snapshot', async (_event, { sessionPath, baseName, imageDat
   }
 });
 
+// IPC: Open an existing folder of images for timelapse creation
+ipcMain.handle('open-folder-for-timelapse', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Folder with Images',
+  });
+  if (result.canceled) return null;
+
+  const folderPath = result.filePaths[0];
+  const imageExts = ['.jpg', '.jpeg', '.png'];
+  const files = fs.readdirSync(folderPath)
+    .filter(f => imageExts.includes(path.extname(f).toLowerCase()))
+    .sort();
+
+  return { folderPath, imageCount: files.length };
+});
+
 // IPC: Create a timelapse video from the images in a session folder
-ipcMain.handle('create-timelapse', async (_event, { sessionPath }) => {
+ipcMain.handle('create-timelapse', async (_event, { sessionPath, frameDuration }) => {
   if (!sessionPath || !fs.existsSync(sessionPath)) {
     return { success: false, error: 'Session folder not found.' };
   }
 
+  const duration = (typeof frameDuration === 'number' && frameDuration > 0) ? frameDuration : 0.3;
+  const imageExts = ['.jpg', '.jpeg', '.png'];
+
   const files = fs.readdirSync(sessionPath)
-    .filter(f => f.toLowerCase().endsWith('.jpg'))
+    .filter(f => imageExts.includes(path.extname(f).toLowerCase()))
     .sort();
 
   if (files.length === 0) {
@@ -211,19 +233,24 @@ ipcMain.handle('create-timelapse', async (_event, { sessionPath }) => {
   const outputPath = path.join(saveDir, outputName);
   const filelistPath = path.join(sessionPath, 'filelist.txt');
 
-  // Build concat filelist with 0.3s duration per frame
+  // Build concat filelist with the specified duration per frame
   const entries = files.map(f => {
     const fp = path.join(sessionPath, f).replace(/\\/g, '/');
-    return `file '${fp}'\nduration 0.3`;
+    return `file '${fp}'\nduration ${duration}`;
   });
   // Repeat the last file without a duration directive so FFmpeg renders it for
-  // the full 0.3s instead of discarding it (required by the concat demuxer)
+  // the full duration instead of discarding it (required by the concat demuxer)
   const lastFp = path.join(sessionPath, files[files.length - 1]).replace(/\\/g, '/');
   entries.push(`file '${lastFp}'`);
   fs.writeFileSync(filelistPath, entries.join('\n') + '\n');
 
+  // Total output frames ≈ imageCount * frameDuration * outputFps
+  const totalOutputFrames = Math.round(files.length * duration * OUTPUT_FPS);
+
   try {
-    await runFFmpegFromFilelist(filelistPath, outputPath);
+    await runFFmpegFromFilelist(filelistPath, outputPath, totalOutputFrames, (percent) => {
+      mainWindow.webContents.send('timelapse-progress', { percent });
+    });
     return { success: true, outputPath };
   } catch (err) {
     return { success: false, error: err.message || 'FFmpeg encoding failed.' };
@@ -232,7 +259,7 @@ ipcMain.handle('create-timelapse', async (_event, { sessionPath }) => {
   }
 });
 
-function runFFmpegFromFilelist(filelistPath, outputPath) {
+function runFFmpegFromFilelist(filelistPath, outputPath, totalOutputFrames, onProgress) {
   return new Promise((resolve, reject) => {
     const args = [
       '-y',
@@ -242,8 +269,9 @@ function runFFmpegFromFilelist(filelistPath, outputPath) {
       '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-r', '30',
+      '-r', String(OUTPUT_FPS),
       '-preset', 'fast',
+      '-progress', 'pipe:1',
       outputPath,
     ];
 
@@ -251,11 +279,32 @@ function runFFmpegFromFilelist(filelistPath, outputPath) {
     const ffmpeg = spawn(cmd, args);
 
     let stderr = '';
+    let stdoutBuf = '';
+
     ffmpeg.stderr.on('data', (data) => { stderr += data.toString(); });
 
+    if (onProgress) {
+      ffmpeg.stdout.on('data', (data) => {
+        stdoutBuf += data.toString();
+        const lines = stdoutBuf.split('\n');
+        stdoutBuf = lines.pop();
+        for (const line of lines) {
+          const m = line.match(/^frame=(\d+)/);
+          if (m && totalOutputFrames > 0) {
+            const pct = Math.round((parseInt(m[1], 10) / totalOutputFrames) * 100);
+            onProgress(pct);
+          }
+        }
+      });
+    }
+
     ffmpeg.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`FFmpeg exited with code ${code}: ${stderr.slice(-500)}`));
+      if (code === 0) {
+        if (onProgress) onProgress(100);
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}: ${stderr.slice(-500)}`));
+      }
     });
 
     ffmpeg.on('error', (err) => {

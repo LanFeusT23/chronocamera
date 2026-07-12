@@ -2,30 +2,46 @@
 (function () {
   'use strict';
 
-  const DEFAULT_INTERVALS = [2, 5, 10, 30, 60];
+  const DEFAULT_INTERVAL = 2;
+  const DEFAULT_FRAME_DURATION = 0.3;
   const EXPORT_WIDTH = 1920;
   const EXPORT_HEIGHT = 1080;
+
+  function formatFrameDuration(value) {
+    const numericValue = parseFloat(value);
+    const roundedValue = Math.round(numericValue * 100) / 100;
+    return `${roundedValue}s`;
+  }
 
   // DOM elements
   const videoEl = document.getElementById('webcam-preview');
   const canvasEl = document.getElementById('capture-canvas');
   const recordBtn = document.getElementById('record-btn');
   const timelapseBtn = document.getElementById('timelapse-btn');
+  const openFolderBtn = document.getElementById('open-folder-btn');
   const settingsBtn = document.getElementById('settings-btn');
   const intervalLabel = document.getElementById('interval-label');
+  const speedLabel = document.getElementById('speed-label');
   const saveDirInput = document.getElementById('save-dir');
   const browseBtn = document.getElementById('browse-btn');
   const filenameInput = document.getElementById('filename');
   const statusBar = document.getElementById('status-bar');
   const captureProgressContainer = document.getElementById('capture-progress-container');
   const captureProgressBar = document.getElementById('capture-progress-bar');
+  const encodeProgressContainer = document.getElementById('encode-progress-container');
+  const encodeProgressBar = document.getElementById('encode-progress-bar');
+  const encodeProgressText = document.getElementById('encode-progress-text');
   const settingsModal = document.getElementById('settings-modal');
   const settingsSaveBtn = document.getElementById('settings-save-btn');
   const settingsCancelBtn = document.getElementById('settings-cancel-btn');
-  const customIntervalInput = document.getElementById('custom-interval');
+  const intervalSlider = document.getElementById('interval-slider');
+  const intervalSliderValue = document.getElementById('interval-slider-value');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedSliderValue = document.getElementById('speed-slider-value');
 
   // State
-  let captureIntervalSeconds = DEFAULT_INTERVALS[0];
+  let captureIntervalSeconds = DEFAULT_INTERVAL;
+  let frameDurationSeconds = DEFAULT_FRAME_DURATION;
   let recording = false;
   let captureTimerId = null;
   let captureBusy = false;
@@ -227,12 +243,18 @@
 
     timelapseBtn.disabled = true;
     recordBtn.disabled = true;
+    openFolderBtn.disabled = true;
+    encodeProgressContainer.classList.remove('hidden');
+    encodeProgressBar.style.width = '0%';
+    encodeProgressText.textContent = '0%';
     setStatus('Creating timelapse video...');
 
-    const result = await window.electronAPI.createTimelapse({ sessionPath });
+    const result = await window.electronAPI.createTimelapse({ sessionPath, frameDuration: frameDurationSeconds });
 
+    encodeProgressContainer.classList.add('hidden');
     timelapseBtn.disabled = false;
     recordBtn.disabled = false;
+    openFolderBtn.disabled = false;
 
     if (result.success) {
       setStatus(`Timelapse saved: ${result.outputPath}`);
@@ -244,6 +266,30 @@
     }
   });
 
+  // Open existing folder of images for timelapse reprocessing
+  openFolderBtn.addEventListener('click', async () => {
+    const info = await window.electronAPI.openFolderForTimelapse();
+    if (!info) return;
+
+    if (info.imageCount === 0) {
+      alert('No images (JPG/JPEG/PNG) found in the selected folder.');
+      return;
+    }
+
+    sessionPath = info.folderPath;
+    sessionBaseName = info.folderPath.replace(/\\/g, '/').split('/').pop() || info.folderPath;
+    sessionSnapshotCount = info.imageCount;
+    setStatus(`Opened folder: ${info.imageCount} image${info.imageCount !== 1 ? 's' : ''} found — ${info.folderPath}`);
+    timelapseBtn.classList.remove('hidden');
+  });
+
+  // Listen for encoding progress events
+  window.electronAPI.onTimelapseProgress((data) => {
+    const pct = Math.min(data.percent, 100);
+    encodeProgressBar.style.width = `${pct}%`;
+    encodeProgressText.textContent = `${pct}%`;
+  });
+
   // Browse directory
   browseBtn.addEventListener('click', async () => {
     const dir = await window.electronAPI.selectDirectory();
@@ -252,61 +298,38 @@
 
   // Settings modal
   settingsBtn.addEventListener('click', () => {
-    // Sync current state to modal
-    const radios = settingsModal.querySelectorAll('input[name="interval"]');
-    let found = false;
-    radios.forEach((radio) => {
-      if (radio.value === String(captureIntervalSeconds)) {
-        radio.checked = true;
-        found = true;
-      } else if (radio.value === 'custom' && !found) {
-        // will handle below
-      } else {
-        radio.checked = false;
-      }
-    });
-    if (!found) {
-      const customRadio = settingsModal.querySelector('input[value="custom"]');
-      customRadio.checked = true;
-      customIntervalInput.value = captureIntervalSeconds;
-      customIntervalInput.disabled = false;
-    } else {
-      customIntervalInput.disabled = true;
-      customIntervalInput.value = '';
-    }
+    // Sync capture interval to slider
+    intervalSlider.value = captureIntervalSeconds;
+    intervalSliderValue.textContent = `${captureIntervalSeconds}s`;
+
+    // Sync frame duration to slider
+    speedSlider.value = frameDurationSeconds;
+    speedSliderValue.textContent = formatFrameDuration(frameDurationSeconds);
+
     // Sync timestamp overlay checkbox
     document.getElementById('timestamp-overlay').checked = timestampOverlayEnabled;
     settingsModal.classList.remove('hidden');
   });
 
-  // Toggle custom input when radio changes
-  settingsModal.addEventListener('change', (e) => {
-    if (e.target.name === 'interval') {
-      customIntervalInput.disabled = e.target.value !== 'custom';
-      if (e.target.value === 'custom') customIntervalInput.focus();
-    }
+  // Live-update slider value labels
+  intervalSlider.addEventListener('input', () => {
+    intervalSliderValue.textContent = `${intervalSlider.value}s`;
+  });
+
+  speedSlider.addEventListener('input', () => {
+    speedSliderValue.textContent = formatFrameDuration(speedSlider.value);
   });
 
   settingsSaveBtn.addEventListener('click', () => {
-    const selected = settingsModal.querySelector('input[name="interval"]:checked');
-    if (!selected) return;
-
-    if (selected.value === 'custom') {
-      const val = parseInt(customIntervalInput.value, 10);
-      if (!val || val <= 0) {
-        alert('Custom interval must be a positive integer (1 or greater).');
-        return;
-      }
-      captureIntervalSeconds = val;
-    } else {
-      captureIntervalSeconds = parseInt(selected.value, 10);
-    }
+    captureIntervalSeconds = parseInt(intervalSlider.value, 10);
+    frameDurationSeconds = parseFloat(speedSlider.value);
 
     // Save timestamp overlay setting
     const timestampCheckbox = document.getElementById('timestamp-overlay');
     timestampOverlayEnabled = timestampCheckbox.checked;
 
     intervalLabel.textContent = `Interval: ${captureIntervalSeconds}s`;
+    speedLabel.textContent = `Frame: ${formatFrameDuration(frameDurationSeconds)}`;
     settingsModal.classList.add('hidden');
   });
 
